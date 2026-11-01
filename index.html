@@ -106,6 +106,7 @@ function renderForm(){
  <div class="actions"><input data-k="name" value="${esc(c.name)}" aria-label="Company name" style="max-width:240px"><button id="dup">Duplicate</button><button id="rm">Delete</button></div>
  <div class="card"><h2>Market inputs</h2>
   ${field('Risk-free rate (%)','rf','0.05','Same currency and date as the cash flows')}
+  ${rfLive()}
   ${field('Equity risk premium (%)','erp','0.05','Mature market premium')}
   ${field('Country or other premium (%)','crp','0.05','Only if a market participant would price it and the cash flows do not already reflect it')}
  </div>
@@ -258,5 +259,22 @@ function srcRow(k,l){if(!SK.includes(k))return '';const s=(C().src||{})[k]||{};r
 const srcItems=(c,ke0)=>{const a=[['Risk-free rate','rf'],['Equity risk premium','erp']];if(c.crp)a.push(['Country premium','crp']);a.push(['Tax rate','tax']);if(c.betaMode==='direct')a.push(['Equity beta','beta']);if(!ke0)a.push(c.kdMode==='spread'?['Credit spread','sp']:['Cost of debt','kd']);return a};
 function srcHtml(c,ke0){return '<h2 style="margin-top:14px">Sources</h2><dl>'+srcItems(c,ke0).map(([l,k])=>{const s=(c.src||{})[k]||{};return '<dt>'+l+'</dt><dd>'+(s.s&&s.s.trim()?esc(s.s)+(s.d?', as at '+esc(s.d):''):'<span style="color:var(--warn)">No source recorded</span>')+'</dd>'}).join('')+'</dl>'}
 function renderBasis(){const c=C();document.getElementById('basis').innerHTML='<b>What are you valuing?</b><div class="tabs" role="radiogroup" aria-label="Valuation basis" style="margin:8px 0 0">'+[['wacc','The business as a whole','Discount rate: WACC'],['ke','Equity cash flows only','Discount rate: cost of equity']].map(([v,l,s])=>`<button class="tab" role="radio" aria-checked="${c.basis===v}" data-basis="${v}">${l}<small style="display:block;opacity:.8">${s}</small></button>`).join('')+'</div>'}
+let RF=null,RFM='uk',RFT='10';
+function rfLive(){const o=(a,sel)=>a.map(([v,l])=>`<option value="${v}"${v===sel?' selected':''}>${l}</option>`).join('');return `<div class="src" style="grid-template-columns:minmax(0,1fr) 90px auto;margin-top:-6px"><select id="rfMkt" aria-label="Market for live rate">${o([['uk','UK gilts'],['us','US Treasuries']],RFM)}</select><select id="rfTen" aria-label="Maturity in years">${o([['5','5 yr'],['10','10 yr'],['20','20 yr'],['30','30 yr']],RFT)}</select><button id="rfGo">Use live rate</button></div><div id="rfMsg" class="note" style="margin:-6px 0 10px" aria-live="polite"></div>`}
+document.addEventListener('change',e=>{if(e.target.id==='rfMkt')RFM=e.target.value;if(e.target.id==='rfTen')RFT=e.target.value});
+document.addEventListener('click',async e=>{
+ if(e.target.id!=='rfGo')return;
+ const m=document.getElementById('rfMsg');m.textContent='Fetching...';
+ let msg='';
+ try{
+  if(!RF){const r=await fetch('/api/riskfree');if(!r.ok)throw 0;RF=await r.json();setTimeout(()=>{RF=null},600000)}
+  const d=RF[RFM],v=d&&d.rates&&d.rates[RFT];
+  if(typeof v!=='number')throw 1;
+  const c=C();c.rf=v;c.src=c.src||{};c.src.rf={s:d.source+', '+RFT+'-year',d:d.asOf};
+  renderForm();renderOut();save();
+  msg='Set to '+v.toFixed(2)+'% (as at '+d.asOf+'). Check it is in the same currency as your cash flows.';
+ }catch(x){msg=x===1?'No rate available for that market and maturity. Try another, or type your own.':'Could not fetch live rates. Type the rate in yourself, or try again later.'}
+ const n=document.getElementById('rfMsg');if(n)n.textContent=msg;
+});
 all();
 </script></body></html>
