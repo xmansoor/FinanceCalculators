@@ -260,8 +260,13 @@ const srcItems=(c,ke0)=>{const a=[['Risk-free rate','rf'],['Equity risk premium'
 function srcHtml(c,ke0){return '<h2 style="margin-top:14px">Sources</h2><dl>'+srcItems(c,ke0).map(([l,k])=>{const s=(c.src||{})[k]||{};return '<dt>'+l+'</dt><dd>'+(s.s&&s.s.trim()?esc(s.s)+(s.d?', as at '+esc(s.d):''):'<span style="color:var(--warn)">No source recorded</span>')+'</dd>'}).join('')+'</dl>'}
 function renderBasis(){const c=C();document.getElementById('basis').innerHTML='<b>What are you valuing?</b><div class="tabs" role="radiogroup" aria-label="Valuation basis" style="margin:8px 0 0">'+[['wacc','The business as a whole','Discount rate: WACC'],['ke','Equity cash flows only','Discount rate: cost of equity']].map(([v,l,s])=>`<button class="tab" role="radio" aria-checked="${c.basis===v}" data-basis="${v}">${l}<small style="display:block;opacity:.8">${s}</small></button>`).join('')+'</div>'}
 let RF=null,RFM='uk',RFT='10';
-function rfLive(){const o=(a,sel)=>a.map(([v,l])=>`<option value="${v}"${v===sel?' selected':''}>${l}</option>`).join('');return `<div class="src" style="grid-template-columns:minmax(0,1fr) 90px auto;margin-top:-6px"><select id="rfMkt" aria-label="Market for live rate">${o([['uk','UK gilts'],['us','US Treasuries']],RFM)}</select><select id="rfTen" aria-label="Maturity in years">${o([['5','5 yr'],['10','10 yr'],['20','20 yr'],['30','30 yr']],RFT)}</select><button id="rfGo">Use live rate</button></div><div id="rfMsg" class="note" style="margin:-6px 0 10px" aria-live="polite"></div>`}
-document.addEventListener('change',e=>{if(e.target.id==='rfMkt')RFM=e.target.value;if(e.target.id==='rfTen')RFT=e.target.value});
+function rfLive(){if(RFM==='uk'&&RFT==='30')RFT='10';const o=(a,sel)=>a.map(([v,l])=>`<option value="${v}"${v===sel?' selected':''}>${l}</option>`).join('');return `<div class="src" style="grid-template-columns:minmax(0,1fr) 90px auto;margin-top:-6px"><select id="rfMkt" aria-label="Market for live rate">${o([['uk','UK gilts'],['us','US Treasuries']],RFM)}</select><select id="rfTen" aria-label="Maturity in years">${tenOpts()}</select><button id="rfGo">Use live rate</button></div><div id="rfMsg" class="note" style="margin:-6px 0 10px" aria-live="polite"></div>`}
+const RFTEN=[['5','5 yr'],['10','10 yr'],['20','20 yr'],['30','30 yr']];
+const tenOpts=()=>RFTEN.filter(x=>RFM!=='uk'||x[0]!=='30').map(([v,l])=>`<option value="${v}"${v===RFT?' selected':''}>${l}</option>`).join('');
+document.addEventListener('change',e=>{
+ if(e.target.id==='rfMkt'){RFM=e.target.value;if(RFM==='uk'&&RFT==='30')RFT='10';const t=document.getElementById('rfTen');if(t)t.innerHTML=tenOpts()}
+ if(e.target.id==='rfTen')RFT=e.target.value;
+});
 document.addEventListener('click',async e=>{
  if(e.target.id!=='rfGo')return;
  const m=document.getElementById('rfMsg');m.textContent='Fetching...';
