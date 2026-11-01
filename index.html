@@ -108,6 +108,7 @@ function renderForm(){
   ${field('Risk-free rate (%)','rf','0.05','Same currency and date as the cash flows')}
   ${rfLive()}
   ${field('Equity risk premium (%)','erp','0.05','Mature market premium')}
+  ${erpLive()}
   ${field('Country or other premium (%)','crp','0.05','Only if a market participant would price it and the cash flows do not already reflect it')}
  </div>
  <div class="card"><h2>Target capital structure and tax</h2>
@@ -280,6 +281,22 @@ document.addEventListener('click',async e=>{
   msg='Set to '+v.toFixed(2)+'% (as at '+d.asOf+'). Check it is in the same currency as your cash flows.';
  }catch(x){msg=x===1?'No rate available for that market and maturity. Try another, or type your own.':'Could not fetch live rates. Type the rate in yourself, or try again later.'}
  const n=document.getElementById('rfMsg');if(n)n.textContent=msg;
+});
+let ERPD=null;
+function erpLive(){return `<div class="src" style="grid-template-columns:1fr;margin-top:-6px"><button id="erpGo">Use Damodaran implied ERP</button></div><div id="erpMsg" class="note" style="margin:-6px 0 10px" aria-live="polite"></div>`}
+document.addEventListener('click',async e=>{
+ if(e.target.id!=='erpGo')return;
+ const m=document.getElementById('erpMsg');m.textContent='Fetching...';
+ let msg='';
+ try{
+  if(!ERPD){const r=await fetch('/api/erp');if(!r.ok)throw 0;ERPD=await r.json();setTimeout(()=>{ERPD=null},600000)}
+  const h=ERPD.headline;if(!h||typeof h.value!=='number')throw 1;
+  const c=C();c.erp=h.value;c.src=c.src||{};c.src.erp={s:ERPD.source+' ('+h.label+')',d:ERPD.asOf};
+  renderForm();renderOut();save();
+  const v=ERPD.measures.map(x=>x.value),lo=Math.min(...v),hi=Math.max(...v);
+  msg='Set to '+h.value.toFixed(2)+'% (as at '+ERPD.asOf+'). Damodaran\'s other methods range from '+lo.toFixed(2)+'% to '+hi.toFixed(2)+'%. This is a mature market premium: add any country premium separately below.';
+ }catch(x){msg='Could not fetch the premium. Type it in yourself, or try again later.'}
+ const n=document.getElementById('erpMsg');if(n)n.textContent=msg;
 });
 all();
 </script></body></html>
