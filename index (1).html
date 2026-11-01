@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WACC calculator</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{--bg:#eef1f0;--card:#fff;--ink:#12241f;--mut:#5d6d68;--line:#d6ddda;--eq:#0b6e5c;--db:#c2851a;--warn:#9a5b00;--bad:#b3261e;--soft:#f6f8f7;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1614;--card:#16211e;--ink:#e6eeeb;--mut:#93a39d;--line:#2a3833;--eq:#3fc2a6;--db:#e0a840;--warn:#e8a64a;--bad:#ff8a80;--soft:#1b2926}}
+:root[data-theme="dark"]{--bg:#0e1614;--card:#16211e;--ink:#e6eeeb;--mut:#93a39d;--line:#2a3833;--eq:#3fc2a6;--db:#e0a840;--warn:#e8a64a;--bad:#ff8a80;--soft:#1b2926}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums}
+main{max-width:1080px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:22px;margin:0 0 4px;font-weight:600}
+h2{font-size:15px;margin:0 0 10px;font-weight:600}
+.sub{color:var(--mut);margin:0 0 16px;max-width:70ch}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.tab,button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:6px 12px;border-radius:6px;cursor:pointer}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--eq);outline-offset:1px}
+.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:16px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:14px}
+.row{display:grid;grid-template-columns:1fr 110px;gap:8px 12px;align-items:center;margin-bottom:8px}
+.row label{color:var(--ink)}.row small{display:block;color:var(--mut);font-size:12.5px}
+input,select{font:inherit;width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
+input[type=checkbox]{width:auto}
+.peers{width:100%;border-collapse:collapse;font-size:13.5px}
+.peers th{text-align:left;font-weight:500;color:var(--mut);padding:2px 4px}
+.peers td{padding:2px 3px}.peers input{padding:4px 6px}
+.x{padding:2px 8px}
+.big{font-size:40px;font-weight:600;line-height:1.1}
+.bar{display:flex;height:22px;border-radius:5px;overflow:hidden;margin:10px 0 6px;background:var(--soft)}
+.bar span{display:block;height:100%}
+.leg{display:flex;gap:16px;flex-wrap:wrap;color:var(--mut);font-size:13px}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}
+dl{display:grid;grid-template-columns:1fr auto;gap:5px 12px;margin:0}dd{margin:0;text-align:right;font-weight:500}dt{color:var(--mut)}
+.flag{padding:7px 10px;border-radius:6px;background:var(--soft);border-left:3px solid var(--warn);margin-top:8px;font-size:13.5px}
+.flag.bad{border-left-color:var(--bad)}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}.tbl th,.tbl td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line)}.tbl th:first-child,.tbl td:first-child{text-align:left}.tbl tr[data-i]{cursor:pointer}.tbl tr.on{background:var(--soft)}
+.note{color:var(--mut);font-size:12.5px;margin-top:8px}
+.actions{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.wide{overflow-x:auto}textarea{font:inherit;width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);min-height:70px}details{margin-top:10px}summary{cursor:pointer;color:var(--mut)}.row label input{margin-top:4px}[hidden]{display:none!important}
+.srow{margin-bottom:12px}.sh{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:14px}.sh b{font-weight:500}.sh span{color:var(--mut);font-size:12.5px}
+input[type=range]{padding:0;border:0;background:transparent;accent-color:var(--eq);margin:6px 0 0;height:24px}
+.sres{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:14px}.sres div{background:var(--soft);border-radius:6px;padding:8px 10px}.sres small{display:block;color:var(--mut);font-size:12.5px}.sres strong{font-size:18px;font-weight:600}
+#basis .tab{text-align:left}.tab[aria-checked="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.cav{border-left-width:5px;margin:12px 0 0;font-size:14px}.cav b{display:block;margin-bottom:2px}
+.src{display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:8px 12px;margin:-2px 0 12px}.src input{font-size:12.5px;padding:4px 6px}
+</style></head>
+<body><main>
+<div class="card" id="basis"></div>
+<h1>WACC calculator</h1>
+<p class="sub">Build a market participant WACC for any company. Beta, cost of debt and weights all come from one target capital structure. Starting values are placeholders, not market data: replace them with your own sources.</p>
+<div class="tabs" id="tabs" role="tablist"></div>
+<div class="grid">
+ <div id="form"></div>
+ <div>
+  <div class="card" id="out"></div>
+  <div class="card" id="sens"></div>
+  <div class="card"><h2>All companies</h2><div class="wide"><table class="tbl" id="cmp"></table></div></div>
+ </div>
+</div>
+</main>
+<script>
+const KEY='wacc-v1';
+const mk=(name)=>({name:name||'Company',basis:'wacc',g:2,src:{},rf:4.5,erp:5.0,crp:0,wd:25,tax:25,shield:true,betaMode:'peers',beta:1.0,
+ peers:[{n:'Peer A',b:1.1,d:30,e:100,t:25,v:0},{n:'Peer B',b:0.95,d:20,e:100,t:25,v:0},{n:'Peer C',b:1.25,d:45,e:100,t:25,v:0}],q:{},kdMode:'spread',sp:2.0,kd:6.5});
+let S={cs:[mk('Company 1')],a:0};
+try{const r=localStorage.getItem(KEY);if(r){const p=JSON.parse(r);if(p&&p.cs&&p.cs.length)S=p}}catch(e){}
+S.cs.forEach(c=>{c.basis=c.basis||'wacc';if(c.g===undefined)c.g=2;c.src=c.src||{};c.q=c.q||{};c.peers.forEach(p=>{if(p.d===undefined){p.d=p.de||0;p.e=100;p.v=0}})});
+const Q=[['biz','What does the business do? (industry and sub-sector)'],['geo','Where do its cash flows come from? (main countries)'],['cur','Which currency are the cash flows in?'],['size','How large is it? (revenue or enterprise value, with currency)'],['list','Listed or private, and which market if listed?'],['rate','Credit rating, or roughly how leveraged is it?'],['feat','Anything that changes risk: cyclical, regulated, asset-heavy, early-stage?'],['date','Valuation date'],['np','How many peers do you want? (default 6)']];
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const C=()=>S.cs[S.a];
+const med=a=>{if(!a.length)return NaN;a=[...a].sort((x,y)=>x-y);const m=a.length>>1;return a.length%2?a[m]:(a[m-1]+a[m])/2};
+const f=(x,d=2)=>isFinite(x)?x.toFixed(d):'n/a';
+const pc=x=>isFinite(x)?x.toFixed(2)+'%':'n/a';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function calc(c,d){d=d||Z;
+ const w=(d.wd?Math.min(95,Math.max(0,c.wd+d.wd)):c.wd)/100,t=(d.tax?Math.min(60,Math.max(0,c.tax+d.tax)):c.tax)/100,ts=c.shield?t:0,de=w<1?w/(1-w):NaN;
+ let bu=NaN,bl;
+ if(c.betaMode==='peers'){
+  const us=c.peers.filter(p=>p.b>0&&p.e>0).map(p=>p.b/(1+(1-p.t/100)*p.d/p.e));
+  bu=med(us);bl=bu*(1+(1-t)*de);
+ }else bl=+c.beta;
+ bl+=d.beta;
+ const rf=c.rf+d.rf,erp=c.erp+d.erp,ke=rf+bl*erp+c.crp;
+ const kd=(c.kdMode==='spread'?rf+c.sp:+c.kd)+d.kd;
+ const kda=kd*(1-ts);
+ const wacc=(1-w)*ke+w*kda;
+ const pre=ts>0?wacc/(1-t):wacc;
+ return {rf,erp,w,t,ts,de,bu,bl,ke,kd,kda,wacc,pre,n:c.peers.filter(p=>p.b>0&&p.e>0).length,nu:c.peers.filter(p=>p.b>0&&p.e>0&&!p.v).length};
+}
+
+function field(label,k,step,hint,suf){return field0(label,k,step,hint,suf)+srcRow(k,label)}
+function field0(label,k,step,hint,suf){
+ return `<div class="row"><label>${label}${hint?`<small>${hint}</small>`:''}</label><input type="number" step="${step}" data-k="${k}" value="${C()[k]}" aria-label="${label}${suf?' ('+suf+')':''}"></div>`;
+}
+function peerRows(){
+ return C().peers.map((p,i)=>`<tr><td><input data-p="${i}.n" value="${esc(p.n)}" aria-label="Peer name"></td><td><input type="number" step="0.01" data-p="${i}.b" value="${p.b}" aria-label="Levered beta"></td><td><input type="number" step="any" data-p="${i}.d" value="${p.d}" aria-label="Debt"></td><td><input type="number" step="any" data-p="${i}.e" value="${p.e}" aria-label="Equity market value"></td><td><input type="number" step="0.5" data-p="${i}.t" value="${p.t}" aria-label="Tax rate %"></td><td><input type="checkbox" data-pv="${i}" ${p.v?'checked':''} aria-label="Verified against a source"></td><td><button class="x" data-del="${i}" aria-label="Remove peer">×</button></td></tr>`).join('');
+}
+function renderForm(){
+ const c=C();
+ document.getElementById('form').innerHTML=`
+ <div class="actions"><input data-k="name" value="${esc(c.name)}" aria-label="Company name" style="max-width:240px"><button id="dup">Duplicate</button><button id="rm">Delete</button></div>
+ <div class="card"><h2>Market inputs</h2>
+  ${field('Risk-free rate (%)','rf','0.05','Same currency and date as the cash flows')}
+  ${field('Equity risk premium (%)','erp','0.05','Mature market premium')}
+  ${field('Country or other premium (%)','crp','0.05','Only if a market participant would price it and the cash flows do not already reflect it')}
+ </div>
+ <div class="card"><h2>Target capital structure and tax</h2>
+  ${field('Debt weight, D/(D+E) (%)','wd','1','Market participant target, such as the peer median')}
+  ${field('Marginal tax rate (%)','tax','0.5','Rate on deductible interest')}
+  <div class="row"><label>Interest tax shield is usable<small>Untick for loss-making entities or where interest is restricted</small></label><input type="checkbox" data-k="shield" ${c.shield?'checked':''}></div>
+ </div>
+ <div class="card"><h2>Terminal growth check</h2>
+  ${field('Terminal growth rate (%)','g','0.1','Long-run nominal growth after the forecast period')}
+  <p class="note">Checked against the discount rate for the basis chosen at the top of the page, and again against the sensitivity sliders.</p>
+ </div>
+ <div class="card"><h2>Find similar companies</h2><p class="note" style="margin-top:0">Answer what you can. Claude uses your answers to suggest comparable listed companies with approximate debt, equity, beta and tax rate, plus equity and country risk premiums. Claude cannot look up live data, so every figure is an unverified estimate until you check it.</p>${Q.map(([k,l])=>`<div class="row" style="grid-template-columns:1fr"><label>${l}<input data-q="${k}" value="${esc(c.q[k]||'')}"></label></div>`).join('')}<div class="actions"><button id="suggest">Suggest peers and premiums</button><button id="stop" hidden>Stop</button></div><div id="sugOut" aria-live="polite"></div><details><summary>Paste peer data from your own source</summary><textarea id="paste" aria-label="Peer rows" placeholder="Name, levered beta, debt, equity value, tax %"></textarea><div class="actions"><button id="imp">Import rows</button></div></details><details><summary>Where to get each figure</summary><p class="note">Debt: borrowings and lease liabilities in the latest annual report, with the fair value note. Equity: share price × shares outstanding at the valuation date. Beta: regression against the local index (for example 5 years monthly or 2 years weekly) from a data terminal, or published industry betas. Tax: the marginal statutory rate. Equity and country risk premiums: Damodaran's published tables, Kroll or PwC.</p></details></div>
+ <div class="card"><h2>Equity beta</h2>
+  <div class="row"><label>Source</label><select data-k="betaMode"><option value="peers" ${c.betaMode==='peers'?'selected':''}>Peer set</option><option value="direct" ${c.betaMode==='direct'?'selected':''}>Direct equity beta</option></select></div>
+  <div id="betaBody">${betaBody()}</div>
+ </div>
+ <div class="card"><h2>Cost of debt (pre-tax)</h2>
+  <div class="row"><label>Source</label><select data-k="kdMode"><option value="spread" ${c.kdMode==='spread'?'selected':''}>Risk-free + credit spread</option><option value="direct" ${c.kdMode==='direct'?'selected':''}>Direct rate</option></select></div>
+  <div id="kdBody">${kdBody()}</div>
+  <p class="note">Use the current rate for new long-term borrowing at the credit quality the target structure implies, not the coupon on existing loans.</p>
+ </div>`;
+}
+function betaBody(){
+ const c=C();
+ if(c.betaMode==='direct')return field('Equity beta','beta','0.01','Already at the target capital structure');
+ return `<div class="wide"><table class="peers"><thead><tr><th>Peer</th><th>Levered beta</th><th>Debt</th><th>Equity</th><th>Tax (%)</th><th>Verified</th><th></th></tr></thead><tbody id="peerBody">${peerRows()}</tbody></table></div><div class="actions" style="margin-top:8px"><button id="addPeer">Add peer</button></div><p class="note">Each beta is unlevered with the peer's own D/E, the median is taken, then relevered at the target above.</p>`;
+}
+function kdBody(){return C().kdMode==='spread'?field('Credit spread (%)','sp','0.05','For the target rating, tenor and currency'):field('Cost of debt (%)','kd','0.05','Pre-tax');}
+
+function renderOut(){
+ const c=C(),r=calc(c);
+ const fl=[];
+ if(isFinite(r.ke)&&r.kd>r.ke)fl.push(['bad','Cost of debt is not below cost of equity. Check dates, currency and tenor of the inputs.']);
+ if(c.wd<0||c.wd>=95)fl.push(['bad','Debt weight is outside a sensible range.']);
+ if(isFinite(r.bl)&&(r.bl<0.4||r.bl>2.2))fl.push(['','Relevered beta of '+f(r.bl)+' is unusual. Check peers and target structure.']);
+ if(c.betaMode==='peers'&&r.n<3)fl.push(['','Fewer than three usable peers makes the median noisy.']);
+ if(c.betaMode==='peers'&&r.nu)fl.push(['',r.nu+' of '+r.n+' peers are not marked verified. Check each against a filing or data provider before relying on the result.']);
+ if(!c.shield&&c.tax>0)fl.push(['','No tax shield applied: after-tax and pre-tax rates are the same.']);
+ const ke0=c.basis==='ke',rate=ke0?r.ke:r.wacc,tl=tg(c.g,rate);
+ if(tl===2)fl.push(['bad','Terminal growth of '+f(c.g,1)+'% is within 1 point of the discount rate of '+f(rate,1)+'%, or above it. The terminal value formula divides by (rate minus growth), so the result becomes unstable or meaningless. Lower the growth rate or revisit the inputs.']);
+ else if(tl===1)fl.push(['','Terminal growth above about 3% is higher than long-run GDP growth in most economies. This is not blocked, but it needs a clear reason, such as high inflation or a fast-growing market.']);
+ const ms=srcItems(c,ke0).filter(x=>!(c.src[x[1]]&&c.src[x[1]].s&&c.src[x[1]].s.trim()));
+ if(ms.length)fl.push(['',ms.length+(ms.length>1?' inputs have':' input has')+' no source recorded: '+ms.map(x=>x[0].toLowerCase()).join(', ')+'. Add the source and date before relying on this result.']);
+ const eq=(1-r.w)*r.ke,db=r.w*r.kda,tot=eq+db||1;
+ document.getElementById('out').innerHTML=`
+ <h2>${esc(c.name)}: ${ke0?'cost of equity':'post-tax WACC'}</h2>
+ <div class="big">${pc(ke0?r.ke:r.wacc)}</div>
+ <div class="flag cav"><b>Apply this rate to adjusted cash flows, not raw EBITDA</b>${ke0?'Use it on cash flows to equity: after interest, tax and net borrowing, and adjusted for capex, working capital and one-offs. Do not apply it to EBITDA or to cash flows before interest.':'Use it on unlevered, post-tax cash flows to the firm, adjusted for capex, working capital and one-offs. Do not apply it to raw EBITDA or accounting profit.'}</div>
+ <div class="bar" ${ke0?'hidden':''} role="img" aria-label="Equity contributes ${f(eq)} points, debt ${f(db)} points"><span style="width:${eq/tot*100}%;background:var(--eq)"></span><span style="width:${db/tot*100}%;background:var(--db)"></span></div>
+ <div class="leg" ${ke0?'hidden':''}><span><i style="background:var(--eq)"></i>Equity ${f(eq)} pts</span><span><i style="background:var(--db)"></i>Debt after tax ${f(db)} pts</span></div>
+ <dl style="margin-top:14px">
+  <dt>Cost of equity</dt><dd>${pc(r.ke)}</dd>
+  <dt>Relevered equity beta</dt><dd>${f(r.bl)}</dd>
+  ${c.betaMode==='peers'?`<dt>Median asset beta (${r.n} peers)</dt><dd>${f(r.bu)}</dd>`:''}
+  <dt>Target D/E</dt><dd>${isFinite(r.de)?f(r.de*100,1)+'%':'n/a'}</dd>
+  ${ke0?'':`<dt>Cost of debt, pre-tax</dt><dd>${pc(r.kd)}</dd>`}
+  ${ke0?'':`<dt>Cost of debt, after tax</dt><dd>${pc(r.kda)}</dd>`}
+  ${ke0?'':`<dt>Weights: equity / debt</dt><dd>${f((1-r.w)*100,1)}% / ${f(r.w*100,1)}%</dd>`}
+  ${ke0?'':`<dt>Approximate pre-tax rate</dt><dd>${pc(r.pre)}</dd>`}
+ </dl>
+ ${srcHtml(c,ke0)}
+ ${fl.map(x=>`<div class="flag ${x[0]}">${x[1]}</div>`).join('')}
+ <p class="note">Cost of equity = Rf + beta × ERP + premium. WACC = E/V × Ke + D/V × Kd × (1 − t). The pre-tax figure divides by (1 − t), which is only a rough approximation. IAS 36 requires the pre-tax rate that gives the same value on pre-tax cash flows, found by iteration.</p>`;
+ document.getElementById('cmp').innerHTML=`<thead><tr><th>Company</th><th>Ke</th><th>Kd after tax</th><th>D/V</th><th>WACC</th></tr></thead><tbody>${S.cs.map((x,i)=>{const q=calc(x);return `<tr data-i="${i}" class="${i===S.a?'on':''}"><td>${esc(x.name)}</td><td>${pc(q.ke)}</td><td>${pc(q.kda)}</td><td>${f(q.w*100,0)}%</td><td>${pc(q.wacc)}</td></tr>`}).join('')}</tbody>`;
+ if(document.getElementById('ss'))updateSens();
+}
+function renderTabs(){
+ document.getElementById('tabs').innerHTML=S.cs.map((x,i)=>`<button class="tab" role="tab" aria-selected="${i===S.a}" data-t="${i}">${esc(x.name)}</button>`).join('')+'<button id="add">+ Add company</button>';
+}
+function all(){D={...Z};renderBasis();renderTabs();renderForm();renderOut();renderSens();save()}
+
+document.addEventListener('input',e=>{
+ const t=e.target,c=C();
+ if(t.dataset.k){
+  const k=t.dataset.k;
+  if(t.type==='checkbox')c[k]=t.checked;
+  else if(t.tagName==='SELECT'){c[k]=t.value;if(k==='betaMode')document.getElementById('betaBody').innerHTML=betaBody();else document.getElementById('kdBody').innerHTML=kdBody()}
+  else if(k==='name'){c.name=t.value||'Company';renderTabs()}
+  else c[k]=t.value===''?0:parseFloat(t.value);
+ }else if(t.dataset.p){
+  const [i,k]=t.dataset.p.split('.');c.peers[i][k]=k==='n'?t.value:(t.value===''?0:parseFloat(t.value));
+ }else if(t.dataset.pv!==undefined){c.peers[+t.dataset.pv].v=t.checked?1:0}else if(t.dataset.q){c.q[t.dataset.q]=t.value}else return;
+ renderOut();save();
+});
+document.addEventListener('click',e=>{
+ const t=e.target.closest('button,tr[data-i]');if(!t)return;
+ if(t.dataset.t!==undefined){S.a=+t.dataset.t;all()}
+ else if(t.dataset.i!==undefined){S.a=+t.dataset.i;all()}
+ else if(t.id==='suggest')suggest();else if(t.id==='stop'){CTL&&CTL.abort()}else if(t.id==='imp')importRows();else if(t.id==='addS')addSug();else if(t.id==='useErp')useP('erp');else if(t.id==='useCrp')useP('crp');else if(t.id==='add'){S.cs.push(mk('Company '+(S.cs.length+1)));S.a=S.cs.length-1;all()}
+ else if(t.id==='dup'){const d=JSON.parse(JSON.stringify(C()));d.name+=' copy';S.cs.push(d);S.a=S.cs.length-1;all()}
+ else if(t.id==='rm'){if(S.cs.length>1){S.cs.splice(S.a,1);S.a=0;all()}}
+ else if(t.id==='addPeer'){C().peers.push({n:'Peer '+(C().peers.length+1),b:1,d:25,e:100,t:25,v:0});document.getElementById('betaBody').innerHTML=betaBody();renderOut();save()}
+ else if(t.dataset.del!==undefined){C().peers.splice(+t.dataset.del,1);document.getElementById('betaBody').innerHTML=betaBody();renderOut();save()}
+});
+let SUG=null,CTL=null;
+const setBeta=()=>{const c=C();c.betaMode='peers';const s=document.querySelector('[data-k=betaMode]');if(s)s.value='peers';document.getElementById('betaBody').innerHTML=betaBody();renderOut();save()};
+async function suggest(){
+ const out=document.getElementById('sugOut'),c=C();
+ let sample=null;try{sample=await claude.use('sample')}catch(e){}
+ if(!sample){out.innerHTML='<div class="flag">Claude is not available in this view. Use the paste box instead.</div>';return}
+ CTL=new AbortController();document.getElementById('stop').hidden=false;out.textContent='Thinking...';
+ const n=parseInt(c.q.np)||6;
+ const prompt='You help a valuation analyst pick comparable listed companies for a WACC.\nCompany profile:\n'+Q.map(([k,l])=>l+' '+(c.q[k]||'not given')).join('\n')+'\n\nSuggest '+n+' comparable listed companies. You cannot browse, so use only what you know. Give approximate figures from your own knowledge in millions of the company reporting currency, and use null for anything you are not reasonably confident of. Never invent precise figures. Also give an equity risk premium for a mature market and a country risk premium for the main country, as percentages, or null.\nReturn ONLY JSON: {"peers":[{"name":"","country":"","currency":"","beta":0.0,"debt":0,"equity":0,"tax":0,"why":""}],"erp":0.0,"crp":0.0,"note":""}\nbeta is the levered equity beta, debt is total borrowings including leases, equity is market capitalisation, tax is the marginal tax rate in percent.';
+ try{SUG=await sample.json(prompt,{signal:CTL.signal});showSug()}
+ catch(e){out.innerHTML='<div class="flag bad">'+(e.code==='not_granted'?'Permission to use Claude was declined.':e.code==='cancelled'?'Stopped.':'Could not get suggestions ('+esc(e.code||'error')+'). Try again, or use the paste box.')+'</div>'}
+ finally{const b=document.getElementById('stop');if(b)b.hidden=true}
+}
+function showSug(){
+ const s=SUG||{},ps=Array.isArray(s.peers)?s.peers:[],out=document.getElementById('sugOut');
+ const v=x=>x==null||x===''?'?':esc(x);
+ out.innerHTML='<div class="flag">Unverified estimates from Claude\'s own knowledge, not live data. Check each against a filing or data provider.</div><div class="wide"><table class="peers"><thead><tr><th></th><th>Company</th><th>Beta</th><th>Debt</th><th>Equity</th><th>Tax %</th></tr></thead><tbody>'+ps.map((p,i)=>'<tr><td><input type="checkbox" data-s="'+i+'" '+(p.beta>0&&p.debt!=null&&p.equity>0?'checked':'')+' aria-label="Select"></td><td>'+esc(p.name||'')+'<small class="note"> '+esc(p.country||'')+' '+esc(p.currency||'')+'</small></td><td>'+v(p.beta)+'</td><td>'+v(p.debt)+'</td><td>'+v(p.equity)+'</td><td>'+v(p.tax)+'</td></tr>').join('')+'</tbody></table></div><div class="actions" style="margin-top:8px"><button id="addS">Add selected as peers</button>'+(s.erp!=null?'<button id="useErp">Use ERP '+esc(s.erp)+'%</button>':'')+(s.crp!=null?'<button id="useCrp">Use country premium '+esc(s.crp)+'%</button>':'')+'</div>'+(s.note?'<p class="note">'+esc(s.note)+'</p>':'');
+}
+function addSug(){
+ const ps=(SUG&&SUG.peers)||[];
+ document.querySelectorAll('[data-s]').forEach(b=>{if(!b.checked)return;const p=ps[+b.dataset.s];if(p&&p.beta>0&&p.equity>0)C().peers.push({n:String(p.name||'Peer'),b:+p.beta,d:+p.debt||0,e:+p.equity,t:p.tax!=null?+p.tax:C().tax,v:0})});
+ setBeta();
+}
+function useP(k){if(!SUG||SUG[k]==null)return;C()[k]=+SUG[k];const i=document.querySelector('[data-k='+k+']');if(i)i.value=C()[k];renderOut();save()}
+function importRows(){
+ const ta=document.getElementById('paste');let n=0;
+ ta.value.split(/\n/).forEach(l=>{const f=l.split(/[\t,;]+/).map(x=>x.trim());const b=parseFloat(f[1]),d=parseFloat(f[2]),e=parseFloat(f[3]);if(f[0]&&b>0&&e>0&&d>=0){const t=parseFloat(f[4]);C().peers.push({n:f[0],b,d,e,t:isFinite(t)?t:C().tax,v:1});n++}});
+ if(n){ta.value='';setBeta()}
+}
+const Z={beta:0,rf:0,erp:0,kd:0,tax:0,wd:0};let D={...Z};
+const SL=[['beta','Equity beta',-0.5,0.5,0.05,2,''],['rf','Risk-free rate',-2,2,0.1,2,'%'],['erp','Equity risk premium',-2,2,0.1,2,'%'],['kd','Pre-tax cost of debt',-2,2,0.1,2,'%'],['tax','Tax rate',-10,10,1,1,'%'],['wd','Debt weight (D/V)',-20,20,1,1,'%']];
+const sv=(k,r)=>({beta:r.bl,rf:r.rf,erp:r.erp,kd:r.kd,tax:r.t*100,wd:r.w*100})[k];
+const sg=(x,d)=>(x>=0?'+':'\u2212')+Math.abs(x).toFixed(d);
+function renderSens(){
+ document.getElementById('sens').innerHTML='<h2>Sensitivity analysis</h2><div class="sres" id="ss"></div><div id="sf" aria-live="polite"></div>'+SL.map(([k,l,mn,mx,st,dp,u])=>`<div class="srow"><div class="sh"><b>${l}</b><span id="sv-${k}"></span></div><input type="range" data-sd="${k}" min="${mn}" max="${mx}" step="${st}" value="${D[k]}" aria-label="${l}: change from baseline"><div class="sh"><span>${sg(mn,dp)}${u}</span><span id="sa-${k}"></span><span>${sg(mx,dp)}${u}</span></div></div>`).join('')+'<div class="actions"><button id="sreset">Reset sliders</button></div><p class="note">Sliders flex the inputs without changing them. Each shows the value being tested and the effect of that slider alone. A risk-free move also moves the cost of debt when it is built from a spread. Beta moves apply after relevering; tax and debt weight also flow through the relevered beta.</p>';
+ updateSens();
+}
+function updateSens(){
+ const c=C(),b=calc(c),r=calc(c,D),m=c.basis==='ke'?'ke':'wacc',nm=m==='ke'?'cost of equity':'WACC',bm=b[m],rm=r[m],dw=rm-bm,ok=isFinite(dw)&&isFinite(bm)&&bm!==0;
+ const tb=tg(c.g,bm),tf=tg(c.g,rm);document.getElementById('sf').innerHTML=tf===2&&tb<2?'<div class="flag bad">At these slider settings the '+nm+' falls to '+f(rm,1)+'%, within 1 point of terminal growth of '+f(c.g,1)+'%. The terminal value breaks down here.</div>':'';
+ document.getElementById('ss').innerHTML=`<div><small>Baseline ${nm}</small><strong>${pc(bm)}</strong></div><div><small>Flexed ${nm}</small><strong>${pc(rm)}</strong></div><div><small>Change vs baseline</small><strong>${ok?sg(dw/bm*100,1)+'%':'n/a'}</strong><small>${ok?sg(dw,2)+' pts':''}</small></div>`;
+ SL.forEach(([k,l,mn,mx,st,dp,u])=>{
+  document.getElementById('sv-'+k).textContent=f(sv(k,b),dp)+u+' \u2192 '+f(sv(k,r),dp)+u;
+  const a=calc(c,{...Z,[k]:D[k]})[m]-bm;
+  document.getElementById('sa-'+k).textContent=isFinite(a)?'alone: '+sg(a*100,0)+' bps':'';
+ });
+}
+document.addEventListener('input',e=>{const t=e.target;if(t.dataset&&t.dataset.sd){D[t.dataset.sd]=parseFloat(t.value);updateSens()}});
+document.addEventListener('click',e=>{if(e.target.id==='sreset'){D={...Z};renderSens()}});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-basis]');if(b){C().basis=b.dataset.basis;renderBasis();renderOut();renderSens();save()}});
+document.addEventListener('input',e=>{const t=e.target;if(t.dataset&&t.dataset.sv){const [k,p]=t.dataset.sv.split('.'),c=C();c.src=c.src||{};c.src[k]=c.src[k]||{};c.src[k][p]=t.value;renderOut();save()}});
+const tg=(g,rate)=>!isFinite(rate)?0:g>=rate-1?2:g>3?1:0;
+const SK=['rf','erp','crp','tax','beta','sp','kd'];
+function srcRow(k,l){if(!SK.includes(k))return '';const s=(C().src||{})[k]||{};return `<div class="src"><input data-sv="${k}.s" value="${esc(s.s||'')}" placeholder="Source, e.g. Bank of England gilt yields" aria-label="Source: ${esc(l)}"><input data-sv="${k}.d" value="${esc(s.d||'')}" placeholder="As at date" aria-label="As at date: ${esc(l)}"></div>`}
+const srcItems=(c,ke0)=>{const a=[['Risk-free rate','rf'],['Equity risk premium','erp']];if(c.crp)a.push(['Country premium','crp']);a.push(['Tax rate','tax']);if(c.betaMode==='direct')a.push(['Equity beta','beta']);if(!ke0)a.push(c.kdMode==='spread'?['Credit spread','sp']:['Cost of debt','kd']);return a};
+function srcHtml(c,ke0){return '<h2 style="margin-top:14px">Sources</h2><dl>'+srcItems(c,ke0).map(([l,k])=>{const s=(c.src||{})[k]||{};return '<dt>'+l+'</dt><dd>'+(s.s&&s.s.trim()?esc(s.s)+(s.d?', as at '+esc(s.d):''):'<span style="color:var(--warn)">No source recorded</span>')+'</dd>'}).join('')+'</dl>'}
+function renderBasis(){const c=C();document.getElementById('basis').innerHTML='<b>What are you valuing?</b><div class="tabs" role="radiogroup" aria-label="Valuation basis" style="margin:8px 0 0">'+[['wacc','The business as a whole','Discount rate: WACC'],['ke','Equity cash flows only','Discount rate: cost of equity']].map(([v,l,s])=>`<button class="tab" role="radio" aria-checked="${c.basis===v}" data-basis="${v}">${l}<small style="display:block;opacity:.8">${s}</small></button>`).join('')+'</div>'}
+all();
+</script></body></html>
