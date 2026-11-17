@@ -64,11 +64,11 @@ input[type=range]{padding:0;border:0;background:transparent;accent-color:var(--e
 </main>
 <script>
 const KEY='wacc-v1';
-const mk=(name)=>({name:name||'Company',basis:'wacc',g:2,src:{},rf:4.5,erp:5.0,crp:0,wd:25,tax:25,shield:true,betaMode:'peers',beta:1.0,
+const mk=(name)=>({name:name||'Company',basis:'wacc',g:2,src:{},rf:4.5,erp:5.0,crp:0,wd:25,tax:25,taxCountry:'uk',taxBasis:'stat',taxStat:25,etr:25,shield:true,betaMode:'peers',beta:1.0,
  peers:[{n:'Peer A',b:1.1,d:30,e:100,t:25,v:0},{n:'Peer B',b:0.95,d:20,e:100,t:25,v:0},{n:'Peer C',b:1.25,d:45,e:100,t:25,v:0}],q:{},kdMode:'spread',sp:2.0,kd:6.5});
 let S={cs:[mk('Company 1')],a:0};
 try{const r=localStorage.getItem(KEY);if(r){const p=JSON.parse(r);if(p&&p.cs&&p.cs.length)S=p}}catch(e){}
-S.cs.forEach(c=>{c.basis=c.basis||'wacc';if(c.g===undefined)c.g=2;c.src=c.src||{};c.q=c.q||{};c.peers.forEach(p=>{if(p.d===undefined){p.d=p.de||0;p.e=100;p.v=0}})});
+S.cs.forEach(c=>{if(!c.taxCountry){c.taxCountry='uk';c.taxBasis='stat';c.taxStat=c.tax;c.etr=c.tax}c.basis=c.basis||'wacc';if(c.g===undefined)c.g=2;c.src=c.src||{};c.q=c.q||{};c.peers.forEach(p=>{if(p.d===undefined){p.d=p.de||0;p.e=100;p.v=0}})});
 const Q=[['biz','What does the business do? (industry and sub-sector)'],['geo','Where do its cash flows come from? (main countries)'],['cur','Which currency are the cash flows in?'],['size','How large is it? (revenue or enterprise value, with currency)'],['list','Listed or private, and which market if listed?'],['rate','Credit rating, or roughly how leveraged is it?'],['feat','Anything that changes risk: cyclical, regulated, asset-heavy, early-stage?'],['date','Valuation date'],['np','How many peers do you want? (default 6)']];
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const C=()=>S.cs[S.a];
@@ -76,6 +76,33 @@ const med=a=>{if(!a.length)return NaN;a=[...a].sort((x,y)=>x-y);const m=a.length
 const f=(x,d=2)=>isFinite(x)?x.toFixed(d):'n/a';
 const pc=x=>isFinite(x)?x.toFixed(2)+'%':'n/a';
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* Tax: country -> [name, statutory rate %, hint, default source text]. Add rows here to add countries. */
+const TAXC={
+ uk:['United Kingdom',25,'UK corporation tax main rate. Overwrite if a lower rate applies to this entity.','UK corporation tax main rate (GOV.UK)'],
+ us:['United States',21,'US federal rate only. Add your state rate on top if relevant.','US federal corporate income tax rate (IRS)'],
+ other:['Other (enter rate)',null,'Enter the statutory rate for the country where the entity operates.','']
+};
+const EFF_SRC="Entity's own accounts (tax charge / profit before tax)";
+const syncTax=c=>{c.tax=c.taxBasis==='eff'?c.etr:c.taxStat};
+function taxBody(){
+ const c=C(),k=TAXC[c.taxCountry]||TAXC.other,eff=c.taxBasis==='eff';
+ return `<div class="row" style="grid-template-columns:1fr 190px"><label>Country where the entity operates<small>Pre-fills the statutory corporate tax rate</small></label><select data-tax="country" aria-label="Country">${Object.entries(TAXC).map(([v,x])=>`<option value="${v}" ${c.taxCountry===v?'selected':''}>${x[0]}</option>`).join('')}</select></div>
+ <div class="row" style="grid-template-columns:1fr 190px"><label>Tax rate to use<small>Statutory is the default. Effective suits an entity with a stable, known rate</small></label><select data-tax="basis" aria-label="Tax rate basis"><option value="stat" ${eff?'':'selected'}>Statutory rate</option><option value="eff" ${eff?'selected':''}>Entity's effective rate</option></select></div>`
+ +(eff?field0('Effective tax rate (%)','etr','0.5','Tax charge divided by profit before tax, normalised for one-offs'):field0('Statutory tax rate (%)','taxStat','0.5',k[2]))
+ +srcRow('tax','Tax rate');
+}
+function taxChange(w,v){
+ const c=C();c.src=c.src||{};
+ const defs=Object.values(TAXC).map(x=>x[3]).concat(EFF_SRC);
+ if(w==='country'){c.taxCountry=v;const k=TAXC[v];if(k&&k[1]!=null)c.taxStat=k[1]}
+ else c.taxBasis=v;
+ const k=TAXC[c.taxCountry]||TAXC.other,cur=(c.src.tax&&c.src.tax.s)||'';
+ if(!cur||defs.includes(cur))c.src.tax={s:c.taxBasis==='eff'?EFF_SRC:k[3],d:(c.src.tax&&c.src.tax.d)||''};
+ syncTax(c);
+ document.getElementById('taxBody').innerHTML=taxBody();
+ renderOut();save();
+}
 
 function calc(c,d){d=d||Z;
  const w=(d.wd?Math.min(95,Math.max(0,c.wd+d.wd)):c.wd)/100,t=(d.tax?Math.min(60,Math.max(0,c.tax+d.tax)):c.tax)/100,ts=c.shield?t:0,de=w<1?w/(1-w):NaN;
@@ -113,7 +140,7 @@ function renderForm(){
  </div>
  <div class="card"><h2>Target capital structure and tax</h2>
   ${field('Debt weight, D/(D+E) (%)','wd','1','Market participant target, such as the peer median')}
-  ${field('Marginal tax rate (%)','tax','0.5','Rate on deductible interest')}
+  <div id="taxBody">${taxBody()}</div>
   <div class="row"><label>Interest tax shield is usable<small>Untick for loss-making entities or where interest is restricted</small></label><input type="checkbox" data-k="shield" ${c.shield?'checked':''}></div>
  </div>
  <div class="card"><h2>Terminal growth check</h2>
@@ -146,6 +173,7 @@ function renderOut(){
  if(isFinite(r.bl)&&(r.bl<0.4||r.bl>2.2))fl.push(['','Relevered beta of '+f(r.bl)+' is unusual. Check peers and target structure.']);
  if(c.betaMode==='peers'&&r.n<3)fl.push(['','Fewer than three usable peers makes the median noisy.']);
  if(c.betaMode==='peers'&&r.nu)fl.push(['',r.nu+' of '+r.n+' peers are not marked verified. Check each against a filing or data provider before relying on the result.']);
+ if(c.taxBasis==='eff')fl.push(['','Effective tax rate in use. Effective rates are distorted by one-offs and permanent differences, so check it reflects the rate on deductible interest going forward. A market participant WACC normally uses the marginal statutory rate.']);
  if(!c.shield&&c.tax>0)fl.push(['','No tax shield applied: after-tax and pre-tax rates are the same.']);
  const ke0=c.basis==='ke',rate=ke0?r.ke:r.wacc,tl=tg(c.g,rate);
  if(tl===2)fl.push(['bad','Terminal growth of '+f(c.g,1)+'% is within 1 point of the discount rate of '+f(rate,1)+'%, or above it. The terminal value formula divides by (rate minus growth), so the result becomes unstable or meaningless. Lower the growth rate or revisit the inputs.']);
@@ -190,7 +218,8 @@ document.addEventListener('input',e=>{
   else c[k]=t.value===''?0:parseFloat(t.value);
  }else if(t.dataset.p){
   const [i,k]=t.dataset.p.split('.');c.peers[i][k]=k==='n'?t.value:(t.value===''?0:parseFloat(t.value));
- }else if(t.dataset.pv!==undefined){c.peers[+t.dataset.pv].v=t.checked?1:0}else if(t.dataset.q){c.q[t.dataset.q]=t.value}else return;
+ }else if(t.dataset.pv!==undefined){c.peers[+t.dataset.pv].v=t.checked?1:0}else if(t.dataset.q){c.q[t.dataset.q]=t.value}else if(t.dataset.tax){taxChange(t.dataset.tax,t.value);return}else return;
+ syncTax(c);
  renderOut();save();
 });
 document.addEventListener('click',e=>{
@@ -300,3 +329,4 @@ document.addEventListener('click',async e=>{
 });
 all();
 </script></body></html>
+
