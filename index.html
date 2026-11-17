@@ -58,10 +58,12 @@ input[type=range]{padding:0;border:0;background:transparent;accent-color:var(--e
  <div>
   <div class="card" id="out"></div>
   <div class="card" id="sens"></div>
+  <div class="card" id="exp"></div>
   <div class="card"><h2>All companies</h2><div class="wide"><table class="tbl" id="cmp"></table></div></div>
  </div>
 </div>
 </main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 const KEY='wacc-v1';
 const mk=(name)=>({name:name||'Company',basis:'wacc',g:2,src:{},rf:4.5,erp:5.0,crp:0,wd:25,tax:25,taxCountry:'uk',taxBasis:'stat',taxStat:25,etr:25,shield:true,betaMode:'peers',beta:1.0,
@@ -180,6 +182,7 @@ function renderOut(){
  else if(tl===1)fl.push(['','Terminal growth above about 3% is higher than long-run GDP growth in most economies. This is not blocked, but it needs a clear reason, such as high inflation or a fast-growing market.']);
  const ms=srcItems(c,ke0).filter(x=>!(c.src[x[1]]&&c.src[x[1]].s&&c.src[x[1]].s.trim()));
  if(ms.length)fl.push(['',ms.length+(ms.length>1?' inputs have':' input has')+' no source recorded: '+ms.map(x=>x[0].toLowerCase()).join(', ')+'. Add the source and date before relying on this result.']);
+ LASTFL=fl.map(x=>x[1]);
  const eq=(1-r.w)*r.ke,db=r.w*r.kda,tot=eq+db||1;
  document.getElementById('out').innerHTML=`
  <h2>${esc(c.name)}: ${ke0?'cost of equity':'post-tax WACC'}</h2>
@@ -206,7 +209,7 @@ function renderOut(){
 function renderTabs(){
  document.getElementById('tabs').innerHTML=S.cs.map((x,i)=>`<button class="tab" role="tab" aria-selected="${i===S.a}" data-t="${i}">${esc(x.name)}</button>`).join('')+'<button id="add">+ Add company</button>';
 }
-function all(){D={...Z};renderBasis();renderTabs();renderForm();renderOut();renderSens();save()}
+function all(){D={...Z};renderBasis();renderTabs();renderForm();renderOut();renderSens();renderExport();save()}
 
 document.addEventListener('input',e=>{
  const t=e.target,c=C();
@@ -327,6 +330,87 @@ document.addEventListener('click',async e=>{
  }catch(x){msg='Could not fetch the premium. Type it in yourself, or try again later.'}
  const n=document.getElementById('erpMsg');if(n)n.textContent=msg;
 });
+/* ---------- PDF export (Abacus Labs report) ---------- */
+let LASTFL=[];
+const EXO={inp:true,calc:true,peers:true,tax:true,sens:true,src:true,flags:true};
+const EXL=[['inp','Inputs and assumptions'],['calc','Calculation steps'],['peers','Peer set and beta'],['tax','Tax rate detail'],['sens','Sensitivity analysis'],['src','Sources'],['flags','Warnings and notes']];
+function renderExport(){
+ document.getElementById('exp').innerHTML='<h2>Export report</h2><p class="note" style="margin-top:0">Choose what goes in the PDF. The headline result is always included.</p>'+EXL.map(([k,l])=>`<div class="row" style="grid-template-columns:auto 1fr;margin-bottom:4px"><input type="checkbox" data-ex="${k}" ${EXO[k]?'checked':''} aria-label="${l}"><label>${l}</label></div>`).join('')+'<div class="actions" style="margin-top:10px"><button id="pdfGo">Download PDF</button></div><div id="pdfMsg" class="note" aria-live="polite"></div>';
+}
+document.addEventListener('change',e=>{const k=e.target.dataset&&e.target.dataset.ex;if(k)EXO[k]=e.target.checked});
+document.addEventListener('click',e=>{
+ if(e.target.id!=='pdfGo')return;
+ const m=document.getElementById('pdfMsg');
+ try{buildPdf();m.textContent='PDF downloaded.'}
+ catch(x){m.textContent=x&&x.message==='lib'?'The PDF tool did not load. Check your connection, refresh the page and try again.':'Could not create the PDF. Try again.'}
+});
+const PT=s=>String(s==null?'':s).replace(/[\u2212\u2013\u2014]/g,'-').replace(/\u00d7/g,'x').replace(/\u00f7/g,'/').replace(/[\u2018\u2019]/g,"'").replace(/[\u201c\u201d]/g,'"').replace(/\u2192/g,'to').replace(/[^\x20-\x7e\xa3\n]/g,'?');
+function buildPdf(){
+ const J=window.jspdf&&window.jspdf.jsPDF;if(!J)throw new Error('lib');
+ const c=C(),r=calc(c),ke0=c.basis==='ke',m=ke0?'ke':'wacc',doc=new J({unit:'pt',format:'a4'});
+ const PW=595,PH=842,M=48,W=PW-2*M,TEAL=[11,110,92],INK=[18,36,31],MUT=[93,109,104],LN=[214,221,218],SOFT=[246,248,247],AMB=[194,133,26];
+ let y=0;
+ const col=a=>doc.setTextColor(a[0],a[1],a[2]);
+ const top=()=>{doc.setFillColor(TEAL[0],TEAL[1],TEAL[2]);doc.rect(0,0,PW,54,'F');doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(255,255,255);doc.text('Abacus Labs',M,34);doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text('WACC calculator report',PW-M,34,{align:'right'});y=86};
+ const need=h=>{if(y+h>PH-60){doc.addPage();top()}};
+ const rule=(w,c2)=>{doc.setDrawColor(c2[0],c2[1],c2[2]);doc.setLineWidth(w);doc.line(M,y,PW-M,y)};
+ const H=t=>{need(48);y+=8;doc.setFont('helvetica','bold');doc.setFontSize(12);col(TEAL);doc.text(PT(t),M,y);y+=6;rule(.8,LN);y+=16};
+ const P=(t,o)=>{o=o||{};const s=o.s||9.5;doc.setFont('helvetica',o.b?'bold':'normal');doc.setFontSize(s);col(o.c||INK);doc.splitTextToSize(PT(t),o.w||W).forEach(l=>{need(s+6);doc.text(l,o.x==null?M:o.x,y);y+=s+3.5});y+=o.g==null?4:o.g};
+ const KV=(k,v)=>{need(18);doc.setFont('helvetica','normal');doc.setFontSize(9.5);col(MUT);doc.text(PT(k),M,y);doc.setFont('helvetica','bold');col(INK);doc.text(PT(v),PW-M,y,{align:'right'});y+=5;rule(.4,LN);y+=12};
+ const TB=(hd,rows,w)=>{
+  const xs=[];let x=M;w.forEach(q=>{xs.push(x);x+=q*W});
+  const line=(cells,head)=>{need(20);doc.setFont('helvetica',head?'bold':'normal');doc.setFontSize(8.5);col(head?MUT:INK);
+   cells.forEach((t,i)=>{const s=doc.splitTextToSize(PT(t),w[i]*W-8)[0]||'';if(i===0)doc.text(s,xs[i],y);else doc.text(s,xs[i]+w[i]*W-4,y,{align:'right'})});
+   y+=5;rule(.4,LN);y+=12};
+  line(hd,true);rows.forEach(rw=>line(rw,false));y+=4};
+ top();
+ doc.setFont('helvetica','bold');doc.setFontSize(18);col(INK);doc.text(PT(c.name),M,y);y+=20;
+ P((ke0?'Cost of equity, for equity cash flows only':'Post-tax WACC, for the business as a whole')+'   |   Generated '+new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}),{c:MUT,g:8});
+ doc.setFont('helvetica','bold');doc.setFontSize(34);col(TEAL);doc.text(pc(ke0?r.ke:r.wacc),M,y+28);y+=48;
+ if(!ke0){const eq=(1-r.w)*r.ke,db=r.w*r.kda,tot=eq+db||1;doc.setFillColor(TEAL[0],TEAL[1],TEAL[2]);doc.rect(M,y,W*eq/tot,12,'F');doc.setFillColor(AMB[0],AMB[1],AMB[2]);doc.rect(M+W*eq/tot,y,W*db/tot,12,'F');y+=26;P('Teal: equity contributes '+f(eq)+' points.   Amber: debt after tax contributes '+f(db)+' points.',{c:MUT,s:8.5,g:8})}
+ {const cv=ke0?'Apply this rate to cash flows to equity: after interest, tax and net borrowing, and adjusted for capex, working capital and one-offs. Do not apply it to EBITDA or to cash flows before interest.':'Apply this rate to unlevered, post-tax cash flows to the firm, adjusted for capex, working capital and one-offs. Do not apply it to raw EBITDA or accounting profit.';
+  doc.setFontSize(9);const ls=doc.splitTextToSize(PT(cv),W-24),h=ls.length*12.5+26;need(h+8);
+  doc.setFillColor(SOFT[0],SOFT[1],SOFT[2]);doc.rect(M,y,W,h,'F');doc.setFillColor(AMB[0],AMB[1],AMB[2]);doc.rect(M,y,4,h,'F');
+  doc.setFont('helvetica','bold');col(INK);doc.text('Apply this rate to adjusted cash flows, not raw EBITDA',M+14,y+16);doc.setFont('helvetica','normal');ls.forEach((l,i)=>doc.text(l,M+14,y+31+i*12.5));y+=h+14}
+ KV('Cost of equity',pc(r.ke));KV('Relevered equity beta',f(r.bl));
+ if(!ke0){KV('Cost of debt, after tax',pc(r.kda));KV('Weights: equity / debt',f((1-r.w)*100,1)+'% / '+f(r.w*100,1)+'%');KV('Approximate pre-tax rate',pc(r.pre))}
+ if(EXO.inp){H('Inputs and assumptions');
+  KV('Valuation basis',ke0?'Equity cash flows (cost of equity)':'Whole business (WACC)');
+  KV('Risk-free rate',pc(c.rf));KV('Equity risk premium',pc(c.erp));KV('Country or other premium',pc(c.crp));
+  KV('Debt weight, D/(D+E)',f(c.wd,1)+'%');KV('Tax rate used',f(c.tax,1)+'%');KV('Interest tax shield usable',c.shield?'Yes':'No');
+  KV('Equity beta source',c.betaMode==='peers'?'Peer set ('+r.n+' usable peers)':'Direct input');
+  if(!ke0)KV('Cost of debt basis',c.kdMode==='spread'?'Risk-free + credit spread ('+f(c.sp)+'%)':'Direct rate ('+f(c.kd)+'%)');
+  KV('Terminal growth rate',f(c.g,1)+'%')}
+ if(EXO.calc){H('Calculation steps');
+  if(c.betaMode==='peers'){P('1. Asset beta. Each peer beta is unlevered as beta / (1 + (1 - tax) x D/E) using that peer\'s own D/E and tax rate. The median of '+r.n+' usable peers is '+f(r.bu)+'.');
+   P('2. Relevered equity beta = '+f(r.bu)+' x (1 + (1 - '+f(r.t*100,1)+'%) x '+f(r.de,3)+') = '+f(r.bl)+', at the target D/E.')}
+  else P('1. Equity beta entered directly, already at the target capital structure: '+f(r.bl)+'.');
+  P('3. Cost of equity = Rf + beta x ERP + premium = '+f(r.rf)+'% + '+f(r.bl)+' x '+f(r.erp)+'% + '+f(c.crp)+'% = '+pc(r.ke)+'.');
+  if(!ke0){P('4. Pre-tax cost of debt = '+(c.kdMode==='spread'?'Rf + credit spread = '+f(r.rf)+'% + '+f(c.sp)+'% = ':'direct input = ')+pc(r.kd)+'.');
+   P('5. After-tax cost of debt = '+pc(r.kd)+' x (1 - '+f(r.ts*100,1)+'%) = '+pc(r.kda)+'.');
+   P('6. WACC = E/V x Ke + D/V x Kd x (1 - t) = '+f((1-r.w)*100,1)+'% x '+pc(r.ke)+' + '+f(r.w*100,1)+'% x '+pc(r.kda)+' = '+pc(r.wacc)+'.');
+   P('The approximate pre-tax rate of '+pc(r.pre)+' divides by (1 - t), which is only a rough approximation. IAS 36 requires the pre-tax rate that gives the same value on pre-tax cash flows, found by iteration.',{c:MUT,s:8.5})}
+  const rate=ke0?r.ke:r.wacc,tl=tg(c.g,rate);
+  P('Terminal growth check: growth of '+f(c.g,1)+'% against a discount rate of '+f(rate,2)+'%. '+(tl===2?'Growth is within 1 point of the rate or above it, so the terminal value is unstable.':tl===1?'Growth is above about 3%, higher than long-run GDP growth in most economies. Needs a clear reason.':'No terminal growth warning.'))}
+ if(EXO.peers){H('Peer set and beta');
+  if(c.betaMode==='peers'){TB(['Peer','Levered beta','Debt','Equity','D/E','Tax %','Asset beta','Verified'],c.peers.map(p=>{const ok=p.b>0&&p.e>0;return [p.n,f(p.b),f(p.d,1),f(p.e,1),ok?f(p.d/p.e*100,1)+'%':'n/a',f(p.t,1),ok?f(p.b/(1+(1-p.t/100)*p.d/p.e)):'n/a',p.v?'Yes':'No']}),[.2,.12,.1,.12,.11,.09,.13,.13]);
+   P('Median asset beta '+f(r.bu)+' from '+r.n+' usable peers; '+r.nu+' not marked verified.',{c:MUT,s:8.5})}
+  else P('The equity beta of '+f(r.bl)+' was entered directly, so no peer set was used.')}
+ if(EXO.tax){H('Tax rate');
+  KV('Country',(TAXC[c.taxCountry]||TAXC.other)[0]);KV('Rate basis',c.taxBasis==='eff'?'Entity\'s effective rate':'Statutory rate');KV('Rate used',f(c.tax,1)+'%');KV('Interest tax shield usable',c.shield?'Yes':'No');
+  P('The tax rate feeds the relevered beta and the after-tax cost of debt'+(ke0?'':' (and so the WACC)')+'.',{c:MUT,s:8.5})}
+ if(EXO.sens){H('Sensitivity analysis');
+  const b=calc(c);P('Each row flexes one input alone across the slider range, with all other inputs held at the baseline. Baseline '+(ke0?'cost of equity':'WACC')+': '+pc(b[m])+'.',{c:MUT,s:8.5});
+  TB(['Input flexed','Low case','Result','High case','Result'],SL.map(([k,l,mn,mx,st,dp,u])=>{const lo=calc(c,{...Z,[k]:mn}),hi=calc(c,{...Z,[k]:mx});return [l,f(sv(k,lo),dp)+u,pc(lo[m]),f(sv(k,hi),dp)+u,pc(hi[m])]}),[.32,.17,.17,.17,.17])}
+ if(EXO.src){H('Sources');
+  srcItems(c,ke0).forEach(([l,k])=>{const s=(c.src||{})[k]||{};P(l+': '+(s.s&&s.s.trim()?s.s+(s.d?', as at '+s.d:''):'No source recorded'),{g:2})});y+=4}
+ if(EXO.flags){H('Warnings and notes');
+  if(LASTFL.length)LASTFL.forEach(t=>P('- '+t,{g:2}));else P('No warnings raised.');
+  y+=4;P('Cost of equity = Rf + beta x ERP + premium. WACC = E/V x Ke + D/V x Kd x (1 - t). Figures come from the inputs entered above; verify each against its source before relying on this report.',{c:MUT,s:8.5})}
+ const n=doc.getNumberOfPages();
+ for(let i=1;i<=n;i++){doc.setPage(i);doc.setDrawColor(LN[0],LN[1],LN[2]);doc.setLineWidth(.5);doc.line(M,PH-42,PW-M,PH-42);doc.setFont('helvetica','normal');doc.setFontSize(8);col(MUT);doc.text('Abacus Labs',M,PH-28);doc.text('Page '+i+' of '+n,PW-M,PH-28,{align:'right'})}
+ const slug=String(c.name).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'company';
+ doc.save('Abacus-Labs-WACC-'+slug+'-'+new Date().toISOString().slice(0,10)+'.pdf');
+}
 all();
 </script></body></html>
-
