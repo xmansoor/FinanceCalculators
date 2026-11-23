@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EIR calculator</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{--bg:#eef1f0;--card:#fff;--ink:#12241f;--mut:#5d6d68;--line:#d6ddda;--eq:#0b6e5c;--db:#c2851a;--warn:#9a5b00;--bad:#b3261e;--soft:#f6f8f7;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1614;--card:#16211e;--ink:#e6eeeb;--mut:#93a39d;--line:#2a3833;--eq:#3fc2a6;--db:#e0a840;--warn:#e8a64a;--bad:#ff8a80;--soft:#1b2926}}
+:root[data-theme="dark"]{--bg:#0e1614;--card:#16211e;--ink:#e6eeeb;--mut:#93a39d;--line:#2a3833;--eq:#3fc2a6;--db:#e0a840;--warn:#e8a64a;--bad:#ff8a80;--soft:#1b2926}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums}
+main{max-width:1080px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:22px;margin:0 0 4px;font-weight:600}
+h2{font-size:15px;margin:0 0 10px;font-weight:600}
+.sub{color:var(--mut);margin:0 0 16px;max-width:70ch}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.tab,button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:6px 12px;border-radius:6px;cursor:pointer}
+a.tab{text-decoration:none;display:inline-block}
+.tab[aria-current="page"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--eq);outline-offset:1px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:14px}
+.row{display:grid;grid-template-columns:1fr 110px;gap:8px 12px;align-items:center;margin-bottom:8px}
+.row small{display:block;color:var(--mut);font-size:12.5px}
+input,select{font:inherit;width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
+.big{font-size:40px;font-weight:600;line-height:1.1}
+dl{display:grid;grid-template-columns:1fr auto;gap:5px 12px;margin:12px 0 0}dd{margin:0;text-align:right;font-weight:500}dt{color:var(--mut)}
+.flag{padding:7px 10px;border-radius:6px;background:var(--soft);border-left:3px solid var(--warn);margin-top:8px;font-size:13.5px}
+.flag.bad{border-left-color:var(--bad)}.flag.ok{border-left-color:var(--eq)}
+.cav{border-left-width:5px;margin:12px 0 0;font-size:14px}.cav b{display:block;margin-bottom:2px}
+.note{color:var(--mut);font-size:12.5px;margin:10px 0 4px}
+details{margin-top:2px}summary{cursor:pointer;color:var(--mut);margin-bottom:8px}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}.tbl th,.tbl td{text-align:right;padding:5px 8px;border-bottom:1px solid var(--line)}.tbl th:first-child,.tbl td:first-child{text-align:left}
+.wide{overflow:auto;max-height:440px}.wide thead th{position:sticky;top:0;background:var(--card)}
+.cr{padding-left:28px!important}
+[hidden]{display:none!important}
+</style></head>
+<body><main>
+<nav class="tabs" aria-label="Calculators"><a class="tab" href="index.html">WACC</a><a class="tab" href="ibr.html">IBR</a><a class="tab" href="eir.html" aria-current="page">EIR</a></nav>
+<h1>Effective interest rate calculator</h1>
+<p class="sub">Finds the effective interest rate (EIR) for a loan, bond or lease with fees, and builds the amortised cost schedule and journal entries. Fixed-rate instruments only for now. Starting values are placeholders: replace them with your own figures.</p>
+<div class="grid"><div id="form"></div><div><div class="card" id="out"></div><div class="card" id="jnl"></div></div></div>
+<div class="card"><h2>Amortised cost schedule</h2><div class="wide" id="sch"></div></div>
+</main>
+<script>
+const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),f=(x,d)=>x.toFixed(d),num=v=>{const x=parseFloat(v);return isFinite(x)?x:0},fm=x=>x.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2}),o=(a,s)=>a.map(([v,l])=>`<option value="${v}"${String(v)===String(s)?' selected':''}>${l}</option>`).join('');
+const PRE={loan:{amt:100000,fee:2000,rep:0,rate:6,term:5,m:12,prof:'level'},bond:{amt:95000,fee:1000,rep:100000,rate:5,term:5,m:1,prof:'int'},lease:{amt:50000,fee:0,rep:5000,rate:7,term:5,m:12,prof:'level'}};
+const NM={loan:['Loan payable','Loan receivable'],bond:['Bonds payable','Investment in bonds'],lease:['Lease liability','Net investment in the lease']};
+const LB={loan:['Amount received or advanced','Balloon repayable at the end (0 if the payments repay it all)','Stated annual interest rate (%)'],bond:['Issue price (cash received for the bonds)','Face value repayable at maturity','Coupon rate on face value (%)'],lease:['Initial lease liability, or fair value of the asset','Residual or balloon payable at the end','Rate used to set the payments (%)']};
+const S={side:'b',type:'loan',cur:'GBP',ek:'',es:'',jp:1,...PRE.loan},NUMK=['amt','fee','rep','rate','term','m','jp'];
+const R=(l,s,c)=>`<div class="row" style="grid-template-columns:1fr 150px"><label>${l}<small>${s}</small></label>${c}</div>`;
+const AR={amt:'Amount at the start',fee:'Fees and transaction costs',rep:'Amount repayable at the end',rate:'Stated annual rate',term:'Term in years',jp:'Journal period',ek:'Repaid early after period',es:'Amount paid to settle'};
+const I=(k,st,ph)=>`<input type="number" step="${st}" data-k="${k}" value="${S[k]}"${ph?` placeholder="${ph}"`:''} aria-label="${AR[k]}">`;
+
+function form(){const L=LB[S.type];return `<div class="card"><h2>Instrument</h2>`+
+R('I am the','Sets the direction of the journal entries',`<select data-k="side" aria-label="Borrower or lender">${o([['b','Borrower or issuer'],['l','Lender or investor']],S.side)}</select>`)+
+R('Type','Loads typical starting figures',`<select data-k="type" aria-label="Instrument type">${o([['loan','Loan with fees'],['bond','Discounted bond'],['lease','Finance lease']],S.type)}</select>`)+
+R('Currency','Label only',`<input data-k="cur" value="${esc(S.cur)}" aria-label="Currency">`)+`</div>`+
+`<div class="card"><h2>Cash flows</h2>`+
+R(L[0],'Cash at the start, before fees',I('amt','100'))+
+R('Fees and transaction costs','Paid by the borrower, or received by the lender. Use a negative number for lender costs that add to the carrying amount',I('fee','100'))+
+R(L[1],'Paid in addition to the regular payments',I('rep','100'))+
+R('Payment profile','Interest only pays a coupon on the amount repayable. Level payments are set at the stated rate',`<select data-k="prof" aria-label="Payment profile">${o([['level','Level payments'],['int','Interest only (coupon)']],S.prof)}</select>`)+
+R(L[2],'The contract rate, before fees',I('rate','0.01'))+
+R('Term (years)','Rounded to a whole number of payments',I('term','0.5'))+
+R('Payments per year','',`<select data-k="m" aria-label="Payments per year">${o([[12,'Monthly'],[4,'Quarterly'],[2,'Half-yearly'],[1,'Annually']],S.m)}</select>`)+`</div>`+
+`<div class="card"><details><summary>Advanced settings</summary>`+
+R('Show the journal for period','Any period in the schedule',I('jp','1'))+
+R('Repaid early after period (optional)','Stops the schedule and works out the gain or loss',I('ek','1','None'))+
+R('Amount paid to settle (optional)','Including any penalty. Blank means paid at the carrying amount',I('es','100','Carrying amount'))+`</details></div>`}
+
+function calc(){
+ const m=S.m,n=Math.round(S.term*m),i=S.rate/100/m,net=S.amt-S.fee,Rm=S.rep;
+ if(!(S.amt>0)||!(n>=1&&n<=600)||!(net>0))return{err:'Enter an amount above zero, fees below the amount, and a term of 1 to 600 payments.'};
+ const pmt=S.prof==='int'?Rm*i:(i===0?(S.amt-Rm)/n:(S.amt-Rm/Math.pow(1+i,n))*i/(1-Math.pow(1+i,-n)));
+ if(!(pmt>=0))return{err:'The balloon is too large for level payments at this rate. Lower it, or choose interest only.'};
+ const pv=j=>(j===0?pmt*n:pmt*(1-Math.pow(1+j,-n))/j)+Rm*Math.pow(1+j,-n);
+ let lo=-.5,hi=1;if(pv(lo)<net||pv(hi)>net)return{err:'No effective rate fits these cash flows. Check the amounts, fees and payments.'};
+ for(let k=0;k<200;k++){const mid=(lo+hi)/2;if(pv(mid)>net)lo=mid;else hi=mid}
+ const j=(lo+hi)/2,K=(S.ek!==''&&num(S.ek)>=1&&num(S.ek)<n)?Math.round(num(S.ek)):0,end=K||n,rows=[];let bal=net,tI=0,tP=0;
+ for(let t=1;t<=end;t++){const x=bal*j,p=pmt+(t===n?Rm:0),c=bal+x-p;rows.push([t,bal,x,p,c]);tI+=x;tP+=p;bal=c}
+ const close=rows[rows.length-1][4];
+ return{m,n,j,net,pmt,rows,tI,tP,close,K,settle:K?(S.es!==''?num(S.es):close):0};
+}
+
+const DR=(a,x)=>`<tr><td>${a}</td><td>${fm(x)}</td><td></td></tr>`,CR=(a,x)=>`<tr><td class="cr">${a}</td><td></td><td>${fm(x)}</td></tr>`;
+const JT=r=>`<table class="tbl"><thead><tr><th>Account</th><th>Dr</th><th>Cr</th></tr></thead><tbody>${r.join('')}</tbody></table>`;
+
+function out(){
+ const c=calc();
+ if(c.err){$('out').innerHTML=`<h2>Effective interest rate</h2><div class="flag bad">${c.err}</div>`;$('jnl').innerHTML='';$('sch').innerHTML='';return}
+ const b=S.side==='b',A=NM[S.type][b?0:1],IN=b?'Interest expense':'Interest income',nom=c.j*c.m*100,ear=(Math.pow(1+c.j,c.m)-1)*100,fg=[];
+ if(Math.abs(nom-S.rate)>.0005)fg.push(['',`Fees${S.prof==='int'&&S.rep!==S.amt?', and the discount or premium,':''} move the rate from the stated ${f(S.rate,3)}% to ${f(nom,3)}%, a difference of ${f(Math.abs(nom-S.rate),3)} points.`]);
+ if(S.type==='lease'&&b&&S.fee!==0)fg.push(['','Under IFRS 16 a lessee’s initial direct costs go into the right-of-use asset, not the lease liability. Set fees to zero for the liability schedule.']);
+ if(!c.K&&Math.abs(c.close)>.01)fg.push(['bad','The closing balance at the end is not zero, so the schedule does not tie out. Check the inputs.']);
+ let gl=0;if(c.K){gl=b?c.settle-c.close:c.close-c.settle;fg.push([gl>0?'':'ok',`Early repayment after period ${c.K}: carrying amount ${fm(c.close)}, settled for ${fm(c.settle)}, so a ${gl>=0?'loss':'gain'} of ${fm(Math.abs(gl))}.`])}
+ $('out').innerHTML=`<h2>Effective interest rate</h2><div class="big">${f(nom,3)}%</div><p class="note" style="margin-top:4px">Annual rate, compounded ${c.m} time${c.m>1?'s':''} a year. Stated rate ${f(S.rate,3)}%.</p>
+<dl><dt>Net initial carrying amount</dt><dd>${fm(c.net)}</dd><dt>EIR per period</dt><dd>${f(c.j*100,4)}%</dd><dt>Effective annual rate</dt><dd>${f(ear,3)}%</dd><dt>Regular payment</dt><dd>${fm(c.pmt)}</dd><dt>Total interest at the EIR${c.K?' to date':''}</dt><dd>${fm(c.tI)}</dd><dt>${c.K?'Carrying amount at early repayment':'Closing balance at the end'}</dt><dd>${fm(c.close)}</dd></dl>`+
+ fg.map(([k,t])=>`<div class="flag${k?' '+k:''}">${t}</div>`).join('')+
+ `<div class="flag cav"><b>Basis</b>The EIR discounts the contractual cash flows to the net carrying amount, and interest each period is the opening balance times the EIR (IFRS 9 amortised cost). IFRS 9 B5.4.1 to B5.4.3 explain which fees are integral to the EIR. For leases, check the rate and the costs included against IFRS 16 before booking.</div>`;
+ const p=Math.min(Math.max(1,Math.round(S.jp)||1),c.rows.length),r=c.rows[p-1],M=r[3]-r[2];
+ const init=b?[DR('Cash',c.net),CR(A,c.net)]:[DR(A,c.net),CR('Cash',c.net)];
+ const per=b?[DR(IN,r[2]),M>=0?DR(A,M):CR(A,-M),CR('Cash',r[3])]:[DR('Cash',r[3]),CR(IN,r[2]),M>=0?CR(A,M):DR(A,-M)];
+ let ej='';if(c.K){const d=Math.abs(gl),lab=gl>=0?'Loss on early repayment':'Gain on early repayment';ej=`<p class="note"><b>Early repayment, after period ${c.K}</b></p>`+JT(b?[DR(A,c.close),gl>=0?DR(lab,d):'',gl<0?CR(lab,d):'',CR('Cash',c.settle)]:[DR('Cash',c.settle),gl>=0?DR(lab,d):'',gl<0?CR(lab,d):'',CR(A,c.close)])}
+ $('jnl').innerHTML=`<h2>Suggested journal entries</h2><p class="note" style="margin-top:0">Amounts in ${esc(S.cur)}. Fees sit inside the carrying amount and reach the income statement through the EIR.</p><p class="note"><b>Initial recognition</b></p>${JT(init)}<p class="note"><b>Period ${p}</b>: interest, payment and movement in carrying amount</p>${JT(per)}${ej}`;
+ $('sch').innerHTML=`<table class="tbl"><thead><tr><th>Period</th><th>Opening</th><th>Interest at EIR</th><th>Payment</th><th>Closing</th></tr></thead><tbody>${c.rows.map(x=>`<tr><td>${x[0]}</td><td>${fm(x[1])}</td><td>${fm(x[2])}</td><td>${fm(x[3])}</td><td>${fm(x[4])}</td></tr>`).join('')}</tbody></table>`;
+}
+
+$('form').innerHTML=form();
+$('form').addEventListener('input',e=>{
+ const t=e.target,k=t.dataset.k;if(!k)return;
+ S[k]=NUMK.includes(k)?num(t.value):t.value;
+ if(k==='type'){Object.assign(S,PRE[S.type]);$('form').innerHTML=form()}
+ out();
+});
+out();
+</script><script src="signin.js"></script>
+</body></html>
