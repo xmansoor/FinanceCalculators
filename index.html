@@ -47,8 +47,10 @@ input[type=range]{padding:0;border:0;background:transparent;accent-color:var(--e
 #basis .tab{text-align:left}.tab[aria-checked="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .cav{border-left-width:5px;margin:12px 0 0;font-size:14px}.cav b{display:block;margin-bottom:2px}
 .src{display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:8px 12px;margin:-2px 0 12px}.src input{font-size:12.5px;padding:4px 6px}
+a.tab{text-decoration:none;display:inline-block}.tab[aria-current="page"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 </style></head>
 <body><main>
+<nav class="tabs" aria-label="Calculators"><a class="tab" href="index.html" aria-current="page">WACC</a><a class="tab" href="ibr.html">IBR</a></nav>
 <div class="card" id="basis"></div>
 <h1>WACC calculator</h1>
 <p class="sub">Build a market participant WACC for any company. Beta, cost of debt and weights all come from one target capital structure. Starting values are placeholders, not market data: replace them with your own sources.</p>
@@ -413,4 +415,5 @@ function buildPdf(){
  doc.save('Abacus-Labs-WACC-'+slug+'-'+new Date().toISOString().slice(0,10)+'.pdf');
 }
 all();
-</script><script src="signin.js"></script>/body></html>
+</script><script src="signin.js"></script>
+</body></html>
