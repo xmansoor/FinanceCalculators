@@ -1,29 +1,23 @@
 // api/gate.js - the whole server side of the sign-in, in one file.
 //
-//   { action: 'signup', name, email, consent, dataUse, website }
-//        saves the person as unconfirmed and emails them a link that works for 30 minutes
-//   { action: 'confirm', t }
-//        t is the token from the emailed link; marks the email confirmed and returns a 30-day sign-in token
+//   { action: 'signup', name, email, consent, dataUse, website, turnstile }
+//        checks the Cloudflare Turnstile token, saves the person, and returns a 30-day sign-in token
 //
 // Other endpoints (riskfree.js, erp.js) can be protected with:
 //   const { requireUser } = require('./gate');
 //   ...first line inside the handler:  if (!(await requireUser(req, res))) return;
 //
 // Environment variables needed in Vercel:
-//   DATABASE_URL     added automatically by the Neon integration
-//   GATE_SECRET      any random string of 32+ characters
-//   RESEND_API_KEY   your Resend API key
-//   MAIL_FROM        e.g.  Abacus Labs <hello@yourdomain.com>  (domain verified in Resend)
-//   SITE_URL         e.g.  https://my-project-iota-navy.vercel.app  (no trailing slash)
-//   DAILY_LIMIT      optional: live-data requests per user per day (default 50)
+//   DATABASE_URL           added automatically by the Neon integration
+//   GATE_SECRET            any random string of 32+ characters (keep the existing one, so current sign-ins stay valid)
+//   TURNSTILE_SECRET_KEY   the Secret Key from your Cloudflare Turnstile widget
+//   DAILY_LIMIT            optional: live-data requests per user per day (default 50)
 const crypto = require('crypto');
 const { neon } = require('@neondatabase/serverless');
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const LINK_MINUTES = 30;
 const SESSION_DAYS = 30;
 const SIGNUPS_PER_IP_PER_DAY = 20;
-const EMAILS_PER_ADDRESS_PER_DAY = 5;
 
 /* ---------- database ---------- */
 let sql = null;
@@ -72,7 +66,7 @@ function sign(payload) {
   return body + '.' + mac(body);
 }
 
-// purpose is 'confirm' (emailed link) or 'session' (signed-in visitor)
+// purpose is 'session' (signed-in visitor)
 function verify(token, purpose) {
   if (typeof token !== 'string') return null;
   const parts = token.split('.');
@@ -88,15 +82,16 @@ function verify(token, purpose) {
   }
 }
 
-// One-way hash, so IP addresses and emails are never kept in readable form in the usage table.
+// One-way hash, so IP addresses are never kept in readable form in the usage table.
 const shortHash = (v) => crypto.createHash('sha256').update(v + secret()).digest('hex').slice(0, 32);
-function ipHash(req) {
-  const ip =
+function getIp(req) {
+  return (
     String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
     (req.socket && req.socket.remoteAddress) ||
-    'unknown';
-  return shortHash(ip);
+    'unknown'
+  );
 }
+const ipHash = (req) => shortHash(getIp(req));
 
 // Counts one use against a key for today. Returns false once the limit is passed.
 async function hit(key, limit) {
@@ -124,28 +119,24 @@ async function requireUser(req, res) {
   return p;
 }
 
-/* ---------- email ---------- */
-const esc = (s) =>
-  String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-
-async function sendMail(to, name, link) {
-  const key = process.env.RESEND_API_KEY;
-  const from = process.env.MAIL_FROM;
-  if (!key || !from) throw new Error('RESEND_API_KEY or MAIL_FROM is not set');
-  const text =
-    'Hi ' + name + ',\n\n' +
-    'Confirm your email to start using the Abacus Labs calculators:\n' + link + '\n\n' +
-    'This link works for ' + LINK_MINUTES + " minutes. If you didn't ask for it, you can ignore this email.\n";
-  const html =
-    '<p>Hi ' + esc(name) + ',</p>' +
-    '<p><a href="' + link + '">Confirm your email</a> to start using the Abacus Labs calculators.</p>' +
-    '<p>This link works for ' + LINK_MINUTES + ' minutes. If you didn\u2019t ask for it, you can ignore this email.</p>';
-  const r = await fetch('https://api.resend.com/emails', {
+/* ---------- Cloudflare Turnstile ---------- */
+// Asks Cloudflare whether the token from the visitor's browser is genuine.
+// Each token works once and expires after a few minutes.
+async function checkTurnstile(token, ip) {
+  const key = process.env.TURNSTILE_SECRET_KEY;
+  if (!key) throw new Error('TURNSTILE_SECRET_KEY is not set');
+  if (typeof token !== 'string' || !token || token.length > 2048) return false;
+  const form = new URLSearchParams();
+  form.append('secret', key);
+  form.append('response', token);
+  if (ip && ip !== 'unknown') form.append('remoteip', ip);
+  const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
     method: 'POST',
-    headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from, to: [to], subject: 'Confirm your email for Abacus Labs', html, text })
+    body: form
   });
-  if (!r.ok) throw new Error('Resend replied ' + r.status);
+  if (!r.ok) throw new Error('Turnstile replied ' + r.status);
+  const j = await r.json();
+  return j.success === true;
 }
 
 /* ---------- action: signup ---------- */
@@ -157,64 +148,33 @@ async function signup(b, req, res) {
   const email = String(b.email || '').trim().toLowerCase().slice(0, 200);
   if (name.length < 2 || !EMAIL.test(email)) return res.status(400).json({ error: 'invalid' });
   if (b.consent !== true) return res.status(400).json({ error: 'consent' });
+  if (!b.turnstile) return res.status(400).json({ error: 'captcha' });
 
+  // The bot check comes before the IP count, so bots without a valid token
+  // cannot use up the sign-up allowance of real people on the same network.
+  if (!(await checkTurnstile(b.turnstile, getIp(req)))) {
+    return res.status(400).json({ error: 'captcha_failed' });
+  }
   if (!(await hit('ip:' + ipHash(req), SIGNUPS_PER_IP_PER_DAY))) {
     return res.status(429).json({ error: 'too_many' });
   }
-  // Stops the form being used to flood one person's inbox.
-  if (!(await hit('mail:' + shortHash(email), EMAILS_PER_ADDRESS_PER_DAY))) {
-    return res.status(429).json({ error: 'mail_limit' });
-  }
 
   const dataUse = b.dataUse === true;
+  const consentAt = dataUse ? new Date().toISOString() : null;
   const s = await db();
 
-  // Tidy up: remove sign-ups that were never confirmed within 7 days.
-  await s`delete from users where verified_at is null and created_at < now() - interval '7 days'`;
-
-  // Create the user if new. An existing user's name and choices are NOT changed here;
-  // they are applied only when the emailed link is opened.
+  // New person: create them. Returning person (same email): refresh name and data-use choice.
   const rows = await s`
-    insert into users (name, email) values (${name}, ${email})
-    on conflict (email) do update set email = excluded.email
-    returning id`;
-
-  const token = sign({
-    p: 'confirm',
-    uid: rows[0].id,
-    name,
-    dataUse,
-    exp: Date.now() + LINK_MINUTES * 60000
-  });
-  const base = (process.env.SITE_URL || 'https://' + req.headers.host).replace(/\/+$/, '');
-  try {
-    await sendMail(email, name, base + '/?verify=' + encodeURIComponent(token));
-  } catch (e) {
-    console.error('mail error', e && e.message);
-    return res.status(502).json({ error: 'mail_fail' });
-  }
-  return res.status(200).json({ sent: true });
-}
-
-/* ---------- action: confirm ---------- */
-async function confirm(b, res) {
-  const p = verify(b.t, 'confirm');
-  if (!p) return res.status(400).json({ error: 'invalid_link' });
-
-  const dataUse = p.dataUse === true;
-  const s = await db();
-  const rows = await s`
-    update users set
-      name = ${p.name},
-      verified_at = coalesce(verified_at, now()),
+    insert into users (name, email, consent_data_use, consent_data_use_at)
+    values (${name}, ${email}, ${dataUse}::boolean, ${consentAt}::timestamptz)
+    on conflict (email) do update set
+      name = excluded.name,
       last_seen_at = now(),
       consent_data_use_at = case
-        when ${dataUse}::boolean <> consent_data_use then now()
-        else consent_data_use_at end,
-      consent_data_use = ${dataUse}::boolean
-    where id = ${p.uid}
+        when excluded.consent_data_use <> users.consent_data_use then now()
+        else users.consent_data_use_at end,
+      consent_data_use = excluded.consent_data_use
     returning id, consent_data_use`;
-  if (!rows.length) return res.status(400).json({ error: 'invalid_link' });
 
   const exp = Date.now() + SESSION_DAYS * 864e5;
   return res.status(200).json({
@@ -230,7 +190,6 @@ async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'method' });
   try {
     const b = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
-    if (b.action === 'confirm') return await confirm(b, res);
     return await signup(b, req, res);
   } catch (e) {
     console.error('gate error', e && e.message);
