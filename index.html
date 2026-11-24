@@ -323,13 +323,13 @@ document.addEventListener('click',async e=>{
  const m=document.getElementById('erpMsg');m.textContent='Fetching...';
  let msg='';
  try{
-  if(!ERPD){const r=await fetch('/api/erp');if(!r.ok)throw 0;ERPD=await r.json();setTimeout(()=>{ERPD=null},600000)}
+  if(!ERPD){const r=await fetch('/api/erp');if(!r.ok)throw r.status||0;ERPD=await r.json();setTimeout(()=>{ERPD=null},600000)}
   const h=ERPD.headline;if(!h||typeof h.value!=='number')throw 1;
   const c=C();c.erp=h.value;c.src=c.src||{};c.src.erp={s:ERPD.source+' ('+h.label+')',d:ERPD.asOf};
   renderForm();renderOut();save();
   const v=ERPD.measures.map(x=>x.value),lo=Math.min(...v),hi=Math.max(...v);
   msg='Set to '+h.value.toFixed(2)+'% (as at '+ERPD.asOf+'). Damodaran\'s other methods range from '+lo.toFixed(2)+'% to '+hi.toFixed(2)+'%. This is a mature market premium: add any country premium separately below.';
- }catch(x){msg='Could not fetch the premium. Type it in yourself, or try again later.'}
+ }catch(x){msg=(x===1?'The data feed answered but had no premium in it.':typeof x==='number'&&x>1?'The data feed returned an error (HTTP '+x+').':'Could not reach the data feed.')+' Type the premium in yourself, or try again later.'}
  const n=document.getElementById('erpMsg');if(n)n.textContent=msg;
 });
 /* ---------- PDF export (Abacus Labs report) ---------- */
